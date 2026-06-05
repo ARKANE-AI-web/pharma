@@ -1,0 +1,419 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JARVIS — Pharmaceutical AI</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&family=Exo+2:wght@300;400;600&display=swap');
+  :root{--cyan:#00f5ff;--cyan-dim:#00a8b5;--bg:#020d1a;--panel:rgba(0,20,40,0.88);--border:rgba(0,245,255,0.22);--text:#b0e8f0;--white:#e8f8ff;--green:#00ff88;--yellow:#ffd700;--orange:#ff8c00;--red:#ff3a5c;}
+  *{margin:0;padding:0;box-sizing:border-box;}
+  body{background:var(--bg);font-family:'Exo 2',sans-serif;color:var(--text);min-height:100vh;overflow-x:hidden;}
+  body::before{content:'';position:fixed;inset:0;background-image:linear-gradient(rgba(0,245,255,0.03) 1px,transparent 1px),linear-gradient(90deg,rgba(0,245,255,0.03) 1px,transparent 1px);background-size:50px 50px;animation:gridMove 20s linear infinite;pointer-events:none;z-index:0;}
+  @keyframes gridMove{0%{transform:translateY(0)}100%{transform:translateY(50px)}}
+  #particleCanvas{position:fixed;inset:0;z-index:0;pointer-events:none;}
+  .container{position:relative;z-index:1;max-width:860px;margin:0 auto;padding:16px;display:flex;flex-direction:column;gap:14px;}
+
+  .header{display:flex;align-items:center;justify-content:space-between;padding:14px 22px;border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(10px);position:relative;overflow:hidden;}
+  .header::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:scanline 3s ease-in-out infinite;}
+  @keyframes scanline{0%,100%{transform:translateX(-100%)}50%{transform:translateX(100%)}}
+  .logo{font-family:'Orbitron',monospace;font-size:26px;font-weight:900;color:var(--cyan);text-shadow:0 0 20px var(--cyan),0 0 40px rgba(0,245,255,0.4);letter-spacing:8px;}
+  .header-right{display:flex;align-items:center;gap:10px;font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--cyan-dim);}
+  .status-dot{width:9px;height:9px;border-radius:50%;background:var(--green);box-shadow:0 0 10px var(--green);animation:pulse 2s ease-in-out infinite;}
+  @keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+
+  .orb-section{display:flex;justify-content:center;padding:8px 0;}
+  .orb-wrapper{position:relative;width:140px;height:140px;}
+  #orbCanvas{width:140px;height:140px;}
+  .orb-ring{position:absolute;inset:-18px;border-radius:50%;border:1px solid rgba(0,245,255,0.12);animation:orbRing 4s linear infinite;}
+  .orb-ring:nth-child(2){inset:-32px;border-color:rgba(0,245,255,0.06);animation-duration:7s;animation-direction:reverse;}
+  @keyframes orbRing{0%{transform:rotateX(75deg) rotate(0deg)}100%{transform:rotateX(75deg) rotate(360deg)}}
+
+  .disease-section{padding:18px 22px;border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(10px);}
+  .section-label{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan-dim);letter-spacing:3px;margin-bottom:12px;}
+  .disease-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+  .disease-btn{background:rgba(0,245,255,0.03);border:1px solid var(--border);color:var(--text);font-family:'Exo 2',sans-serif;font-size:12px;padding:10px 14px;cursor:pointer;transition:all .25s;text-align:left;line-height:1.4;}
+  .disease-btn:hover{background:rgba(0,245,255,0.08);border-color:var(--cyan);color:var(--white);}
+  .disease-btn.selected{background:rgba(0,245,255,0.12);border-color:var(--cyan);color:var(--cyan);box-shadow:0 0 12px rgba(0,245,255,0.15);}
+  .disease-btn .d-name{font-weight:600;display:block;margin-bottom:2px;}
+  .disease-btn .d-stat{font-size:10px;color:var(--cyan-dim);font-family:'Share Tech Mono',monospace;}
+  .disease-btn.selected .d-stat{color:rgba(0,245,255,0.6);}
+
+  .execute-section{display:flex;justify-content:center;}
+  .execute-btn{background:transparent;border:1px solid var(--cyan);color:var(--cyan);font-family:'Orbitron',monospace;font-size:13px;font-weight:700;letter-spacing:3px;padding:14px 50px;cursor:pointer;transition:all .3s;}
+  .execute-btn:hover:not(:disabled){background:rgba(0,245,255,0.08);box-shadow:0 0 25px rgba(0,245,255,0.25);}
+  .execute-btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .phases-section{border:1px solid var(--border);background:var(--panel);backdrop-filter:blur(10px);display:none;}
+  .phases-section.visible{display:block;}
+  .phase-item{border-bottom:1px solid rgba(0,245,255,0.08);}
+  .phase-item:last-child{border-bottom:none;}
+  .phase-header{display:flex;align-items:center;gap:12px;padding:14px 20px;font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;}
+  .phase-num{width:24px;height:24px;border-radius:50%;border:1px solid currentColor;display:flex;align-items:center;justify-content:center;font-size:10px;flex-shrink:0;}
+  .phase-title{flex:1;}
+  .phase-status{font-size:10px;white-space:nowrap;}
+  .phase-body{padding:0 20px 14px 56px;display:none;}
+  .phase-body.visible{display:block;}
+  .phase-text{font-family:'Share Tech Mono',monospace;font-size:11px;line-height:1.9;color:var(--text);white-space:pre-wrap;word-break:break-word;}
+
+  .phase-item.waiting .phase-header{color:rgba(176,232,240,0.28);}
+  .phase-item.active .phase-header{color:var(--cyan);}
+  .phase-item.active .phase-num{animation:pulse 1s ease-in-out infinite;}
+  .phase-item.done .phase-header{color:var(--green);}
+
+  /* Typing dots */
+  .typing-dots{display:inline-flex;gap:4px;align-items:center;margin-left:4px;}
+  .typing-dots span{width:5px;height:5px;border-radius:50%;background:var(--cyan);animation:dotPulse 1.2s ease-in-out infinite;}
+  .typing-dots span:nth-child(2){animation-delay:.2s;}
+  .typing-dots span:nth-child(3){animation-delay:.4s;}
+  @keyframes dotPulse{0%,80%,100%{transform:scale(.6);opacity:.4}40%{transform:scale(1);opacity:1}}
+
+  .result-section{border:1px solid rgba(0,255,136,0.3);background:rgba(0,8,18,0.95);display:none;}
+  .result-section.visible{display:block;}
+  .result-header{padding:14px 20px;border-bottom:1px solid rgba(0,255,136,0.2);font-family:'Orbitron',monospace;font-size:12px;font-weight:700;color:var(--green);letter-spacing:3px;text-shadow:0 0 12px var(--green);}
+  .result-body{padding:20px;}
+  .compound-name{font-family:'Orbitron',monospace;font-size:22px;font-weight:900;color:var(--cyan);text-shadow:0 0 20px var(--cyan);margin-bottom:5px;}
+  .compound-formula{font-family:'Share Tech Mono',monospace;font-size:14px;color:var(--yellow);letter-spacing:2px;margin-bottom:18px;}
+  .data-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:14px;}
+  .data-card{background:rgba(0,245,255,0.03);border:1px solid var(--border);padding:11px 13px;}
+  .data-card-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan-dim);letter-spacing:2px;margin-bottom:4px;}
+  .data-card-value{font-size:12px;font-weight:600;color:var(--white);line-height:1.4;}
+  .equations-wrap{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);}
+  .eq-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan-dim);letter-spacing:3px;margin-bottom:8px;}
+  .equation{font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--orange);padding:7px 11px;border-left:2px solid var(--orange);margin-bottom:5px;background:rgba(255,140,0,0.04);opacity:0;animation:fadeEq .5s ease forwards;}
+  @keyframes fadeEq{to{opacity:1}}
+  .jarvis-quote{margin-top:14px;padding:12px 15px;border:1px solid rgba(0,245,255,0.18);background:rgba(0,245,255,0.02);}
+  .q-label{font-family:'Share Tech Mono',monospace;font-size:9px;color:var(--cyan-dim);margin-bottom:5px;}
+  .q-text{font-style:italic;font-size:13px;color:var(--white);}
+  .stats-row{display:flex;gap:20px;flex-wrap:wrap;padding-top:12px;border-top:1px solid var(--border);margin-top:12px;}
+  .stat{font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--cyan-dim);}
+  .stat span{color:var(--cyan);}
+
+  .warning{padding:9px 14px;border:1px solid rgba(255,215,0,0.25);background:rgba(255,215,0,0.03);font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--yellow);letter-spacing:1px;text-align:center;}
+  .error-msg{padding:12px 18px;border:1px solid rgba(255,58,92,0.3);background:rgba(255,58,92,0.05);font-family:'Share Tech Mono',monospace;font-size:11px;color:var(--red);display:none;}
+  .error-msg.visible{display:block;}
+
+  ::-webkit-scrollbar{width:3px;}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px;}
+  @media(max-width:540px){.data-grid{grid-template-columns:1fr;}.disease-grid{grid-template-columns:1fr;}.logo{font-size:20px;letter-spacing:4px;}}
+</style>
+</head>
+<body>
+<canvas id="particleCanvas"></canvas>
+<div class="container">
+
+  <div class="header">
+    <div class="logo">JARVIS</div>
+    <div class="header-right">
+      <div class="status-dot"></div>
+      <span>PHARMA·AI v4.2</span>
+      <span id="clockDisplay">--:--:--</span>
+    </div>
+  </div>
+
+  <div class="warning">⚠ SIMULATION — CONTENT CREATION ONLY — NOT REAL MEDICAL ADVICE ⚠</div>
+
+  <div class="orb-section">
+    <div class="orb-wrapper">
+      <canvas id="orbCanvas" width="140" height="140"></canvas>
+      <div class="orb-ring"></div>
+      <div class="orb-ring"></div>
+    </div>
+  </div>
+
+  <div class="disease-section">
+    <div class="section-label">// SELECT TARGET DISEASE — SAUDI ARABIA HIGH PREVALENCE</div>
+    <div class="disease-grid">
+      <button class="disease-btn" onclick="selectDisease(this,'Type 2 Diabetes')">
+        <span class="d-name">السكري النوع الثاني</span>
+        <span class="d-stat">Type 2 Diabetes · 24% SA</span>
+      </button>
+      <button class="disease-btn" onclick="selectDisease(this,'Sickle Cell Disease')">
+        <span class="d-name">الخلايا المنجلية</span>
+        <span class="d-stat">Sickle Cell · genetic · no cure</span>
+      </button>
+      <button class="disease-btn" onclick="selectDisease(this,'Alzheimer Disease')">
+        <span class="d-name">الزهايمر</span>
+        <span class="d-stat">Alzheimer · rising in GCC</span>
+      </button>
+      <button class="disease-btn" onclick="selectDisease(this,'Multiple Sclerosis')">
+        <span class="d-name">التصلب المتعدد</span>
+        <span class="d-stat">MS · high SA rate · no cure</span>
+      </button>
+      <button class="disease-btn" onclick="selectDisease(this,'Familial Hypercholesterolemia')">
+        <span class="d-name">فرط الكوليسترول الوراثي</span>
+        <span class="d-stat">FH · very common in SA</span>
+      </button>
+      <button class="disease-btn" onclick="selectDisease(this,'Beta-Thalassemia')">
+        <span class="d-name">بيتا ثلاسيميا</span>
+        <span class="d-stat">Beta-Thalassemia · genetic · SA</span>
+      </button>
+    </div>
+  </div>
+
+  <div class="execute-section">
+    <button class="execute-btn" id="executeBtn" onclick="startResearch()" disabled>EXECUTE RESEARCH</button>
+  </div>
+
+  <div class="error-msg" id="errorMsg"></div>
+
+  <div class="phases-section" id="phasesSection">
+    <div class="phase-item waiting" id="phase0">
+      <div class="phase-header">
+        <div class="phase-num">1</div>
+        <div class="phase-title">DISEASE ANALYSIS &amp; TARGET IDENTIFICATION</div>
+        <div class="phase-status" id="ps0">WAITING</div>
+      </div>
+      <div class="phase-body" id="pb0">
+        <div class="phase-text" id="pt0"></div>
+      </div>
+    </div>
+    <div class="phase-item waiting" id="phase1">
+      <div class="phase-header">
+        <div class="phase-num">2</div>
+        <div class="phase-title">MOLECULAR DESIGN &amp; STRUCTURE</div>
+        <div class="phase-status" id="ps1">WAITING</div>
+      </div>
+      <div class="phase-body" id="pb1">
+        <div class="phase-text" id="pt1"></div>
+      </div>
+    </div>
+    <div class="phase-item waiting" id="phase2">
+      <div class="phase-header">
+        <div class="phase-num">3</div>
+        <div class="phase-title">CHEMICAL EQUATIONS &amp; SYNTHESIS PATHWAY</div>
+        <div class="phase-status" id="ps2">WAITING</div>
+      </div>
+      <div class="phase-body" id="pb2">
+        <div class="phase-text" id="pt2"></div>
+      </div>
+    </div>
+    <div class="phase-item waiting" id="phase3">
+      <div class="phase-header">
+        <div class="phase-num">4</div>
+        <div class="phase-title">VALIDATION &amp; COMPOUND ASSEMBLY</div>
+        <div class="phase-status" id="ps3">WAITING</div>
+      </div>
+      <div class="phase-body" id="pb3">
+        <div class="phase-text" id="pt3"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="result-section" id="resultSection">
+    <div class="result-header">✦ SYNTHESIS COMPLETE — NEW COMPOUND IDENTIFIED</div>
+    <div class="result-body" id="resultBody"></div>
+  </div>
+
+</div>
+<script>
+// Clock
+setInterval(()=>{document.getElementById('clockDisplay').textContent=new Date().toTimeString().slice(0,8);},1000);
+
+// Particles
+const pc=document.getElementById('particleCanvas'),pctx=pc.getContext('2d');
+function resizePC(){pc.width=window.innerWidth;pc.height=window.innerHeight;}
+resizePC();window.addEventListener('resize',resizePC);
+const pts=Array.from({length:55},()=>({x:Math.random()*window.innerWidth,y:Math.random()*window.innerHeight,vx:(Math.random()-.5)*.3,vy:(Math.random()-.5)*.3,r:Math.random()*1.5+.3,a:Math.random()*.4+.1}));
+(function anim(){pctx.clearRect(0,0,pc.width,pc.height);pts.forEach(p=>{p.x+=p.vx;p.y+=p.vy;if(p.x<0)p.x=pc.width;if(p.x>pc.width)p.x=0;if(p.y<0)p.y=pc.height;if(p.y>pc.height)p.y=0;pctx.beginPath();pctx.arc(p.x,p.y,p.r,0,Math.PI*2);pctx.fillStyle=`rgba(0,245,255,${p.a})`;pctx.fill();});requestAnimationFrame(anim);})();
+
+// Orb
+const oc=document.getElementById('orbCanvas'),octx=oc.getContext('2d');
+let orbAngle=0,orbActive=false;
+const orbPts=Array.from({length:80},()=>({theta:Math.random()*Math.PI*2,phi:Math.random()*Math.PI,r:50+Math.random()*8,speed:(Math.random()-.5)*.018,a:Math.random()*.8+.2}));
+(function drawOrb(){octx.clearRect(0,0,140,140);const cx=70,cy=70;orbAngle+=orbActive?.022:.007;
+const g=octx.createRadialGradient(cx,cy,0,cx,cy,45);g.addColorStop(0,'rgba(0,245,255,0.22)');g.addColorStop(.5,'rgba(0,180,220,0.07)');g.addColorStop(1,'transparent');
+octx.beginPath();octx.arc(cx,cy,45,0,Math.PI*2);octx.fillStyle=g;octx.fill();
+octx.beginPath();octx.arc(cx,cy,50,0,Math.PI*2);octx.strokeStyle='rgba(0,245,255,0.18)';octx.lineWidth=1;octx.stroke();
+orbPts.forEach(p=>{p.theta+=p.speed+(orbActive?.009:0);const x=cx+p.r*Math.sin(p.phi)*Math.cos(p.theta+orbAngle),y=cy+p.r*Math.cos(p.phi)*.6,z=p.r*Math.sin(p.phi)*Math.sin(p.theta+orbAngle),sc=(z+p.r)/(2*p.r),al=p.a*(.3+sc*.7),sz=.8+sc*2;octx.beginPath();octx.arc(x,y,sz,0,Math.PI*2);octx.fillStyle=`rgba(0,245,255,${al})`;octx.fill();});
+if(orbActive){octx.save();octx.translate(cx,cy);octx.rotate(orbAngle*2);octx.strokeStyle='rgba(0,245,255,0.2)';octx.lineWidth=.5;[-25,0,25].forEach(o=>{octx.beginPath();octx.moveTo(-50,o);octx.lineTo(o,50);octx.stroke();octx.beginPath();octx.moveTo(o,-50);octx.lineTo(o,50);octx.stroke();});octx.restore();}
+requestAnimationFrame(drawOrb);})();
+
+// State
+let selectedDisease=null;
+
+function selectDisease(btn,name){
+  document.querySelectorAll('.disease-btn').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  selectedDisease=name;
+  document.getElementById('executeBtn').disabled=false;
+}
+
+// Phase helpers
+function phaseActive(i){
+  const el=document.getElementById('phase'+i);
+  el.className='phase-item active';
+  document.getElementById('ps'+i).innerHTML='PROCESSING... <span class="typing-dots"><span></span><span></span><span></span></span>';
+  document.getElementById('pb'+i).classList.add('visible');
+  el.scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+function phaseDone(i){
+  document.getElementById('phase'+i).className='phase-item done';
+  document.getElementById('ps'+i).textContent='✓ COMPLETE';
+}
+function phaseWaiting(i){
+  document.getElementById('phase'+i).className='phase-item waiting';
+  document.getElementById('ps'+i).textContent='WAITING';
+  document.getElementById('pb'+i).classList.remove('visible');
+  document.getElementById('pt'+i).textContent='';
+}
+
+// Typewriter effect
+function typewrite(el,text,speed=12){
+  return new Promise(resolve=>{
+    el.textContent='';
+    let i=0;
+    const iv=setInterval(()=>{
+      if(i<text.length){
+        el.textContent+=text[i++];
+      }else{
+        clearInterval(iv);
+        resolve();
+      }
+    },speed);
+  });
+}
+
+// API call
+async function callAPI(systemPrompt,userMsg){
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({
+      model:'claude-sonnet-4-20250514',
+      max_tokens:900,
+      system: systemPrompt,
+      messages:[{role:'user',content:userMsg}]
+    })
+  });
+  if(!resp.ok){
+    const err=await resp.text();
+    throw new Error('API error: '+resp.status);
+  }
+  const data=await resp.json();
+  if(!data.content||!data.content[0]){throw new Error('Empty response');}
+  return data.content[0].text||'';
+}
+
+function sleep(ms){return new Promise(r=>setTimeout(r,ms));}
+
+// Main
+async function startResearch(){
+  if(!selectedDisease)return;
+  const btn=document.getElementById('executeBtn');
+  btn.disabled=true;
+  orbActive=true;
+  document.getElementById('errorMsg').classList.remove('visible');
+  document.getElementById('resultSection').classList.remove('visible');
+  document.getElementById('phasesSection').classList.add('visible');
+  [0,1,2,3].forEach(i=>phaseWaiting(i));
+
+  const disease=selectedDisease;
+  let phase1Result='',phase2Result='',phase3Result='';
+
+  try{
+    // PHASE 1
+    phaseActive(0);
+    phase1Result = await callAPI(
+      'You are JARVIS, an advanced pharmaceutical AI. Be scientific and specific.',
+      `Analyze why ${disease} has no radical cure. Cover: the core biological challenge, what current treatments do but fail at, and what a radical cure needs. Write 4 sentences, scientific English.`
+    );
+    await typewrite(document.getElementById('pt0'), phase1Result, 10);
+    phaseDone(0);
+    await sleep(500);
+
+    // PHASE 2
+    phaseActive(1);
+    phase2Result = await callAPI(
+      'You are JARVIS, an advanced pharmaceutical AI. Be scientific and specific.',
+      `Based on this disease analysis of ${disease}:\n${phase1Result}\n\nDesign a completely NEW theoretical drug compound. Give it a creative pharmaceutical name. Include: chemical formula, molecular weight, biological target, and novel mechanism of action. 4-5 sentences.`
+    );
+    await typewrite(document.getElementById('pt1'), phase2Result, 10);
+    phaseDone(1);
+    await sleep(500);
+
+    // PHASE 3
+    phaseActive(2);
+    phase3Result = await callAPI(
+      'You are JARVIS, an advanced pharmaceutical AI. Use real organic chemistry notation.',
+      `Write a 4-step chemical synthesis pathway for the new compound targeting ${disease}.\nMolecule info: ${phase2Result}\n\nFormat each step EXACTLY like:\nSTEP 1: [reactant1] + [reactant2] + [conditions] → [product] + [byproduct]\n\nUse real chemical formulas (C6H5NH2 etc). Make it chemically plausible.`
+    );
+    await typewrite(document.getElementById('pt2'), phase3Result, 10);
+    phaseDone(2);
+    await sleep(500);
+
+    // PHASE 4 - JSON
+    phaseActive(3);
+    const jsonRaw = await callAPI(
+      'You are JARVIS. Output ONLY valid JSON. No markdown. No explanation. No code blocks.',
+      `Compile final data for the new ${disease} compound.\nPhase 2 info: ${phase2Result}\nPhase 3 equations: ${phase3Result}\n\nReturn ONLY this JSON object:\n{"compound_name":"name here","formula":"C24H31N5O4 format","molecular_weight":"XXX.X g/mol","efficacy":"XX.X%","target":"biological target","key_property":"one novel sentence","equations":["STEP 1: eq","STEP 2: eq","STEP 3: eq","STEP 4: eq"],"jarvis_comment":"one dramatic sentence","papers_scanned":847293,"molecules_tested":3291847}`
+    );
+
+    let result=null;
+    try{
+      // Clean any possible markdown
+      const clean=jsonRaw.replace(/```[\w]*\n?/g,'').trim();
+      const jsonMatch=clean.match(/\{[\s\S]+\}/);
+      result=jsonMatch?JSON.parse(jsonMatch[0]):JSON.parse(clean);
+    }catch(e){
+      // Build fallback from previous phases
+      result={
+        compound_name:'SYNTHESIZED COMPOUND',
+        formula:'C26H33N5O5S',
+        molecular_weight:'531.6 g/mol',
+        efficacy:'88.7%',
+        target:'Disease-specific biological pathway',
+        key_property:'Novel mechanism crossing key biological barriers',
+        equations:phase3Result.split('\n').filter(l=>l.startsWith('STEP')).slice(0,4),
+        jarvis_comment:'The synthesis is complete. This changes everything.',
+        papers_scanned:847293,
+        molecules_tested:3291847
+      };
+    }
+
+    document.getElementById('pt3').textContent=
+      `Compound validated.\nFormula: ${result.formula}\nMolecular Weight: ${result.molecular_weight}\nEfficacy projection: ${result.efficacy}\nAssembly complete. Ready for display.`;
+    phaseDone(3);
+    await sleep(700);
+
+    orbActive=false;
+    showResult(result,disease);
+
+  }catch(err){
+    orbActive=false;
+    document.getElementById('errorMsg').textContent='Error: '+err.message+'. Please try again.';
+    document.getElementById('errorMsg').classList.add('visible');
+    btn.disabled=false;
+  }
+  btn.disabled=false;
+}
+
+function showResult(r,disease){
+  const eqs=(r.equations||[]).map((eq,i)=>`<div class="equation" style="animation-delay:${i*.3}s">${eq}</div>`).join('');
+  document.getElementById('resultBody').innerHTML=`
+    <div class="compound-name">${r.compound_name||'NEW COMPOUND'}</div>
+    <div class="compound-formula">${r.formula||'N/A'} &middot; MW: ${r.molecular_weight||'N/A'}</div>
+    <div class="data-grid">
+      <div class="data-card"><div class="data-card-label">TARGET DISEASE</div><div class="data-card-value">${disease}</div></div>
+      <div class="data-card"><div class="data-card-label">THEORETICAL EFFICACY</div><div class="data-card-value" style="color:var(--green)">${r.efficacy||'N/A'}</div></div>
+      <div class="data-card"><div class="data-card-label">MOLECULAR TARGET</div><div class="data-card-value" style="font-size:11px">${r.target||'N/A'}</div></div>
+      <div class="data-card"><div class="data-card-label">KEY NOVEL PROPERTY</div><div class="data-card-value" style="font-size:11px">${r.key_property||'N/A'}</div></div>
+    </div>
+    <div class="equations-wrap">
+      <div class="eq-label">// SYNTHESIS PATHWAY — CHEMICAL EQUATIONS</div>
+      ${eqs}
+    </div>
+    <div class="jarvis-quote">
+      <div class="q-label">JARVIS —</div>
+      <div class="q-text">"${r.jarvis_comment||''}"</div>
+    </div>
+    <div class="stats-row">
+      <div class="stat">PAPERS SCANNED: <span>${(r.papers_scanned||0).toLocaleString()}</span></div>
+      <div class="stat">MOLECULES TESTED: <span>${(r.molecules_tested||0).toLocaleString()}</span></div>
+    </div>`;
+  document.getElementById('resultSection').classList.add('visible');
+  setTimeout(()=>document.getElementById('resultSection').scrollIntoView({behavior:'smooth'}),100);
+}
+</script>
+</body>
+</html>
